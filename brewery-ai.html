@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🍺 Brewery AI</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BreweryAI">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="theme-color" content="#c47c2b">
+
+  <style>
+    :root {
+      --amber: #c47c2b;
+      --amber-dark: #8a520a;
+      --amber-light: #e8a830;
+      --bg: #0f0700;
+      --bg2: #1e0e00;
+      --bg3: #2a1500;
+      --text: #f5e8cc;
+      --text2: #c8a97a;
+      --foam: #f5f0e8;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* ヘッダー */
+    header {
+      background: var(--bg2);
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid var(--amber-dark);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .logo { font-size: 28px; }
+    .header-title { font-size: 20px; font-weight: 700; color: var(--amber-light); }
+    .header-sub { font-size: 11px; color: var(--text2); }
+
+    /* タブ */
+    .tabs {
+      display: flex;
+      gap: 4px;
+    }
+    .tab {
+      flex: 1;
+      padding: 7px 4px;
+      background: var(--bg3);
+      border: 1px solid var(--amber-dark);
+      border-radius: 8px;
+      color: var(--text2);
+      font-size: 12px;
+      font-weight: 500;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab.active {
+      background: var(--amber);
+      color: #fff;
+      border-color: var(--amber);
+    }
+
+    /* メインコンテンツ */
+    main { flex: 1; overflow-y: auto; }
+    .page { display: none; flex-direction: column; height: 100%; }
+    .page.active { display: flex; }
+
+    /* ── チャットページ ── */
+    .api-bar {
+      background: var(--bg2);
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--bg3);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .api-bar input {
+      flex: 1;
+      background: var(--bg3);
+      border: 1px solid var(--amber-dark);
+      border-radius: 8px;
+      padding: 6px 10px;
+      color: var(--text);
+      font-size: 12px;
+    }
+    .api-bar input::placeholder { color: var(--text2); }
+    .api-bar button {
+      background: var(--amber-dark);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .msg {
+      max-width: 85%;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .msg.ai {
+      background: var(--bg3);
+      border: 1px solid var(--amber-dark);
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+    .msg.user {
+      background: var(--amber);
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+    .msg.ai .name {
+      font-size: 11px;
+      color: var(--amber-light);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .typing { color: var(--text2); font-style: italic; font-size: 13px; }
+    .chat-input-area {
+      padding: 12px 16px;
+      background: var(--bg2);
+      border-top: 1px solid var(--bg3);
+      display: flex;
+      gap: 8px;
+    }
+    .chat-input {
+      flex: 1;
+      background: var(--bg3);
+      border: 1px solid var(--amber-dark);
+      border-radius: 20px;
+      padding: 10px 16px;
+      color: var(--text);
+      font-size: 14px;
+      resize: none;
+      max-height: 100px;
+      line-height: 1.4;
+    }
+    .chat-input:focus { outline: none; border-color: var(--amber); }
+    .send-btn {
+      width: 44px; height: 44px;
+      background: var(--amber);
+      border: none;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .send-btn:hover { background: var(--amber-light); }
+    .send-btn:disabled { background: var(--bg3); color: var(--text2); cursor: not-allowed; }
+
+    /* 定型文ボタン */
+    .quick-btns {
+      padding: 8px 16px;
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .quick-btns::-webkit-scrollbar { display: none; }
+    .qbtn {
+      white-space: nowrap;
+      background: var(--bg3);
+      border: 1px solid var(--amber-dark);
+      border-radius: 16px;
+      padding: 5px 12px;
+      color: var(--amber-light);
+      font-size: 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* ── レシピページ ── */
+    .recipes-wrap { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .recipe-card {
+      background: var(--bg2);
+      border: 1px solid var(--amber-dark);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .recipe-card:hover { border-color: var(--amber); }
+    .recipe-name { font-size: 16px; font-weight: 600; color: var(--amber-light); margin-bottom: 4px; }
+    .recipe-style { font-size: 12px; color: var(--text2); margin-bottom: 8px; }
+    .recipe-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tag {
+      font-size: 11px;
+      background: var(--bg3);
+      border: 1px solid var(--amber-dark);
+      border-radius: 10px;
+      padding: 2px 8px;
+      color: var(--text2);
+    }
+    .recipe-detail {
+      display: none;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--bg3);
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text2);
+    }
+    .recipe-detail.open { display: block; }
+    .recipe-detail h4 { color: var(--amber-light); font-size: 13px; margin: 8px 0 4px; }
+    .recipe-detail ul { padding-left: 16px; }
+
+    /* ── タイマーページ ── */
+    .timer-wrap { padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
+    .timer-card {
+      background: var(--bg2);
+      border: 1px solid var(--amber-dark);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .timer-card h3 { color: var(--amber-light); margin-bottom: 12px; font-size: 15px; }
+    .timer-display {
+      text-align: center;
+      font-size: 48px;
+      font-weight: 700;
+      color: var(--foam);
+      letter-spacing: 2px;
+      margin: 12px 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .timer-btns { display: flex; gap: 8px; justify-content: center; }
+    .tbtn {
+      padding: 10px 20px;
+      border-radius: 10px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .tbtn:hover { opacity: 0.85; }
+    .tbtn.start { background: var(--amber); color: #fff; }
+    .tbtn.stop  { background: var(--bg3); color: var(--text2); border: 1px solid var(--amber-dark); }
+    .tbtn.reset { background: #3a1500; color: var(--text2); }
+    .step-input {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+    .step-input label { font-size: 13px; color: var(--text2); width: 80px; flex-shrink: 0; }
+    .step-input input {
+      flex: 1;
+      background: var(--bg3);
+      border: 1px solid var(--amber-dark);
+      border-radius: 8px;
+      padding: 6px 10px;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    /* ── 設定ページ ── */
+    .settings-wrap { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .settings-card {
+      background: var(--bg2);
+      border: 1px solid var(--amber-dark);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .settings-card h3 { color: var(--amber-light); margin-bottom: 12px; font-size: 15px; }
+    .settings-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .settings-row label { font-size: 12px; color: var(--text2); }
+    .settings-row input, .settings-row select {
+      background: var(--bg3);
+      border: 1px solid var(--amber-dark);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--text);
+      font-size: 14px;
+    }
+    .save-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--amber);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .about-text { font-size: 13px; color: var(--text2); line-height: 1.7; }
+    .version { font-size: 12px; color: var(--amber-dark); margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div class="logo">🍺</div>
+    <div>
+      <div class="header-title">Brewery AI</div>
+      <div class="header-sub">あなたのAIビール醸造アシスタント</div>
+    </div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('chat')">💬 AI相談</div>
+    <div class="tab" onclick="switchTab('recipes')">📖 レシピ</div>
+    <div class="tab" onclick="switchTab('timer')">⏱ タイマー</div>
+    <div class="tab" onclick="switchTab('settings')">⚙️ 設定</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── チャットページ ── -->
+  <div class="page active" id="page-chat" style="height: calc(100dvh - 120px);">
+    <div class="api-bar">
+      <input type="password" id="apiKey" placeholder="OpenAI APIキー (sk-...)" />
+      <button onclick="saveKey()">保存</button>
+    </div>
+    <div class="quick-btns">
+      <button class="qbtn" onclick="quickAsk('IPA のレシピを教えて')">🍋 IPA</button>
+      <button class="qbtn" onclick="quickAsk('スタウトのレシピを教えて')">🖤 スタウト</button>
+      <button class="qbtn" onclick="quickAsk('ピルスナーのレシピを教えて')">🌾 ピルスナー</button>
+      <button class="qbtn" onclick="quickAsk('ホップの選び方を教えて')">🌿 ホップ</button>
+      <button class="qbtn" onclick="quickAsk('発酵温度の管理方法は？')">🌡 温度管理</button>
+      <button class="qbtn" onclick="quickAsk('ビールが濁る原因は？')">🔍 トラブル</button>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="msg ai">
+        <div class="name">🍺 Brewery AI</div>
+        ようこそ！醸造に関するご質問はなんでもどうぞ。レシピ提案、ホップ選定、発酵管理など、AIがお答えします🎉<br><br>
+        上のAPIキーを設定するとChatGPTが使えます。設定なしでもデモモードでお試しいただけます！
+      </div>
+    </div>
+    <div class="chat-input-area">
+      <textarea class="chat-input" id="chatInput" placeholder="醸造について質問してください..." rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
+        oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMsg()">↑</button>
+    </div>
+  </div>
+
+  <!-- ── レシピページ ── -->
+  <div class="page" id="page-recipes">
+    <div class="recipes-wrap">
+      <div class="recipe-card" onclick="toggleRecipe(this)">
+        <div class="recipe-name">🌾 アメリカン・ペールエール (APA)</div>
+        <div class="recipe-style">スタイル: American Pale Ale | OG: 1.045–1.060</div>
+        <div class="recipe-tags">
+          <span class="tag">初心者向け</span>
+          <span class="tag">苦味：中</span>
+          <span class="tag">色：黄金色</span>
+        </div>
+        <div class="recipe-detail">
+          <h4>🌾 麦芽 (19L バッチ)</h4>
+          <ul>
+            <li>ペールモルト: 4.0kg</li>
+            <li>クリスタル40L: 0.5kg</li>
+          </ul>
+          <h4>🌿 ホップ</h4>
+          <ul>
+            <li>カスケード 60分: 30g</li>
+            <li>カスケード 5分: 20g</li>
+            <li>ドライホップ: 30g</li>
+          </ul>
+          <h4>🧪 酵母</h4>
+          <ul><li>US-05 / WY1056 (発酵温度: 18–20℃)</li></ul>
+          <h4>📊 目標数値</h4>
+          <ul>
+            <li>OG: 1.052 / FG: 1.010</li>
+            <li>ABV: 約5.5% / IBU: 35</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="recipe-card" onclick="toggleRecipe(this)">
+        <div class="recipe-name">🌿 ウェスト・コースト IPA</div>
+        <div class="recipe-style">スタイル: American IPA | OG: 1.060–1.075</div>
+        <div class="recipe-tags">
+          <span class="tag">中級者</span>
+          <span class="tag">苦味：強</span>
+          <span class="tag">色：淡金色</span>
+        </div>
+        <div class="recipe-detail">
+          <h4>🌾 麦芽 (19L バッチ)</h4>
+          <ul>
+            <li>2-rowペール: 5.0kg</li>
+            <li>クリスタル20L: 0.3kg</li>
+            <li>カラピルス: 0.2kg</li>
+          </ul>
+          <h4>🌿 ホップ</h4>
+          <ul>
+            <li>チヌーク 60分: 40g</li>
+            <li>センテニアル 15分: 30g</li>
+            <li>シムコー DH: 50g</li>
+            <li>アマリロ DH: 50g</li>
+          </ul>
+          <h4>🧪 酵母</h4>
+          <ul><li>WY1056 (19℃)</li></ul>
+          <h4>📊 目標数値</h4>
+          <ul>
+            <li>OG: 1.065 / FG: 1.012</li>
+            <li>ABV: 約7.0% / IBU: 65</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="recipe-card" onclick="toggleRecipe(this)">
+        <div class="recipe-name">🖤 アイリッシュ・スタウト</div>
+        <div class="recipe-style">スタイル: Irish Stout | OG: 1.036–1.044</div>
+        <div class="recipe-tags">
+          <span class="tag">初心者向け</span>
+          <span class="tag">苦味：中</span>
+          <span class="tag">色：ほぼ黒</span>
+        </div>
+        <div class="recipe-detail">
+          <h4>🌾 麦芽 (19L バッチ)</h4>
+          <ul>
+            <li>ペールモルト: 3.2kg</li>
+            <li>フレーク大麦: 0.5kg</li>
+            <li>ローストバーリー: 0.4kg</li>
+          </ul>
+          <h4>🌿 ホップ</h4>
+          <ul>
+            <li>イーストケント・ゴールディングス 60分: 40g</li>
+          </ul>
+          <h4>🧪 酵母</h4>
+          <ul><li>WY1084 アイリッシュエール (18℃)</li></ul>
+          <h4>📊 目標数値</h4>
+          <ul>
+            <li>OG: 1.042 / FG: 1.010</li>
+            <li>ABV: 約4.2% / IBU: 38</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="recipe-card" onclick="toggleRecipe(this)">
+        <div class="recipe-name">🍋 ベルジャン・ウィットビア</div>
+        <div class="recipe-style">スタイル: Witbier | OG: 1.044–1.052</div>
+        <div class="recipe-tags">
+          <span class="tag">初心者向け</span>
+          <span class="tag">苦味：弱</span>
+          <span class="tag">色：白濁</span>
+        </div>
+        <div class="recipe-detail">
+          <h4>🌾 麦芽 (19L バッチ)</h4>
+          <ul>
+            <li>ピルスナーモルト: 2.5kg</li>
+            <li>未発芽小麦: 2.0kg</li>
+            <li>フレークオーツ: 0.3kg</li>
+          </ul>
+          <h4>🌿 ホップ・スパイス</h4>
+          <ul>
+            <li>サアズ 60分: 25g</li>
+            <li>コリアンダー(ボイル5分): 20g</li>
+            <li>オレンジピール乾燥(ボイル5分): 15g</li>
+          </ul>
+          <h4>🧪 酵母</h4>
+          <ul><li>WY3944 ベルジャンウィット (20℃)</li></ul>
+          <h4>📊 目標数値</h4>
+          <ul>
+            <li>OG: 1.048 / FG: 1.010</li>
+            <li>ABV: 約5.0% / IBU: 15</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── タイマーページ ── -->
+  <div class="page" id="page-timer">
+    <div class="timer-wrap">
+
+      <div class="timer-card">
+        <h3>🔥 マッシュ・タイマー</h3>
+        <div class="step-input">
+          <label>時間 (分)</label>
+          <input type="number" id="mashMin" value="60" min="1" max="180">
+        </div>
+        <div class="timer-display" id="mashDisplay">60:00</div>
+        <div class="timer-btns">
+          <button class="tbtn start" onclick="startTimer('mash')">▶ スタート</button>
+          <button class="tbtn stop"  onclick="pauseTimer('mash')">⏸ 一時停止</button>
+          <button class="tbtn reset" onclick="resetTimer('mash')">↺ リセット</button>
+        </div>
+      </div>
+
+      <div class="timer-card">
+        <h3>💧 ボイル・タイマー</h3>
+        <div class="step-input">
+          <label>時間 (分)</label>
+          <input type="number" id="boilMin" value="60" min="1" max="120">
+        </div>
+        <div class="timer-display" id="boilDisplay">60:00</div>
+        <div class="timer-btns">
+          <button class="tbtn start" onclick="startTimer('boil')">▶ スタート</button>
+          <button class="tbtn stop"  onclick="pauseTimer('boil')">⏸ 一時停止</button>
+          <button class="tbtn reset" onclick="resetTimer('boil')">↺ リセット</button>
+        </div>
+      </div>
+
+      <div class="timer-card">
+        <h3>🧪 一次発酵 カウントダウン</h3>
+        <div class="step-input">
+          <label>日数</label>
+          <input type="number" id="fermDays" value="14" min="1" max="60">
+        </div>
+        <div class="timer-display" id="fermDisplay" style="font-size:36px;">14日</div>
+        <div class="timer-btns">
+          <button class="tbtn start" onclick="startFerm()">▶ 開始</button>
+          <button class="tbtn reset" onclick="resetFerm()">↺ リセット</button>
+        </div>
+        <div id="fermStatus" style="text-align:center;margin-top:8px;font-size:12px;color:var(--text2);"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 設定ページ ── -->
+  <div class="page" id="page-settings">
+    <div class="settings-wrap">
+      <div class="settings-card">
+        <h3>🔑 API設定</h3>
+        <div class="settings-row">
+          <label>OpenAI APIキー</label>
+          <input type="password" id="settingsApiKey" placeholder="sk-..." />
+        </div>
+        <div class="settings-row">
+          <label>AIモデル</label>
+          <select id="modelSelect">
+            <option value="gpt-4o-mini">gpt-4o-mini（軽快・経済的）</option>
+            <option value="gpt-4o">gpt-4o（高精度）</option>
+            <option value="gpt-3.5-turbo">gpt-3.5-turbo（高速）</option>
+          </select>
+        </div>
+        <button class="save-btn" onclick="saveSettings()">💾 保存</button>
+      </div>
+
+      <div class="settings-card">
+        <h3>🍺 ブルワリー情報</h3>
+        <div class="settings-row">
+          <label>ブルワリー名</label>
+          <input type="text" id="breweryName" placeholder="My Home Brewery" />
+        </div>
+        <div class="settings-row">
+          <label>お気に入りスタイル</label>
+          <select id="favStyle">
+            <option>IPA</option>
+            <option>スタウト</option>
+            <option>ピルスナー</option>
+            <option>ウィットビア</option>
+            <option>ペールエール</option>
+            <option>サワーエール</option>
+          </select>
+        </div>
+        <button class="save-btn" onclick="saveSettings()">💾 保存</button>
+      </div>
+
+      <div class="settings-card">
+        <h3>ℹ️ このアプリについて</h3>
+        <div class="about-text">
+          <strong>Brewery AI</strong> は、ホームブルワーのためのAIアシスタントアプリです。<br><br>
+          ビールのレシピ提案・ホップ選定・発酵管理・トラブルシューティングなど、醸造に関するあらゆる質問にお答えします。<br><br>
+          OpenAI APIキーを設定すると、ChatGPTを使ったリアルタイムAI対話が利用できます。
+        </div>
+        <div class="version">Version 1.0.0 | Built with ❤️ & 🍺</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ── タブ切替 ──────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const pages = ['chat','recipes','timer','settings'];
+    t.classList.toggle('active', pages[i] === name);
+  });
+  document.querySelectorAll('.page').forEach(p => {
+    p.classList.toggle('active', p.id === 'page-' + name);
+  });
+}
+
+// ── API キー ──────────────────────────────
+function saveKey() {
+  const key = document.getElementById('apiKey').value.trim();
+  if (key) { localStorage.setItem('oai_key', key); alert('✅ APIキーを保存しました'); }
+}
+function getKey() {
+  return localStorage.getItem('oai_key') || '';
+}
+window.addEventListener('load', () => {
+  const k = getKey();
+  if (k) document.getElementById('apiKey').value = k;
+  const bn = localStorage.getItem('breweryName');
+  if (bn) document.getElementById('breweryName').value = bn;
+  const ms = localStorage.getItem('modelSelect');
+  if (ms) document.getElementById('modelSelect').value = ms;
+  const sk = localStorage.getItem('settingsApiKey');
+  if (sk) document.getElementById('settingsApiKey').value = sk;
+});
+
+function saveSettings() {
+  localStorage.setItem('oai_key', document.getElementById('settingsApiKey').value.trim());
+  localStorage.setItem('breweryName', document.getElementById('breweryName').value.trim());
+  localStorage.setItem('modelSelect', document.getElementById('modelSelect').value);
+  document.getElementById('apiKey').value = document.getElementById('settingsApiKey').value;
+  alert('✅ 設定を保存しました');
+}
+
+// ── チャット ──────────────────────────────
+const SYSTEM_PROMPT = `あなたは経験豊富なホームブルワー兼ビールソムリエのAIアシスタントです。
+ビールの醸造（ホームブルーイング）に関するあらゆる質問に日本語で丁寧に答えてください。
+レシピ提案、麦芽・ホップ・酵母の選び方、発酵管理、トラブルシューティング、スタイルの解説など、
+実践的で具体的なアドバイスを提供してください。絵文字を適度に使い、親しみやすいトーンで話してください。`;
+
+const DEMO_ANSWERS = {
+  'IPA': '🌿 IPAのレシピをご提案します！\n\n**ウェスト・コースト IPA（19Lバッチ）**\n\n🌾 麦芽:\n・2-rowペール 5.0kg\n・クリスタル20L 0.3kg\n\n🌿 ホップ:\n・チヌーク 60分 40g\n・センテニアル 15分 30g\n・シムコー DH 50g\n\n🧪 酵母: WY1056（19℃で2週間）\n\n🎯 目標: OG1.065 / ABV約7% / IBU65\n\nカスカードやアマリロのドライホップも試してみてください！',
+  'スタウト': '🖤 スタウトは奥深いスタイルですね！\n\n**アイリッシュ・スタウト（19Lバッチ）**\n\n🌾 麦芽:\n・ペールモルト 3.2kg\n・フレーク大麦 0.5kg\n・ローストバーリー 0.4kg\n\n🌿 ホップ:\n・イーストケント・ゴールディングス 60分 40g\n\n🧪 酵母: WY1084（18℃で2週間）\n\nローストバーリーがコーヒー・チョコレート風味の鍵です☕️',
+  'ピルスナー': '🌾 ピルスナーはラガー系なので温度管理が重要です！\n\n**チェコスタイル・ピルスナー（19Lバッチ）**\n\n🌾 麦芽: ピルスナーモルト 4.0kg\n\n🌿 ホップ:\n・サアズ 60分 40g\n・サアズ 15分 20g\n\n🧪 酵母: WY2001 ウルクウィート（8–10℃）\n\n冷蔵庫で2〜4週間のラガリングがポイントです🍺',
+  'ホップ': '🌿 ホップ選びのポイントをご説明します！\n\n**苦味用ホップ（60分追加）**\n・マグナム・チヌーク・ナゲット\n→ アルファ酸が高く、クリーンな苦味\n\n**アロマ用ホップ（15分以降〜DH）**\n・カスカード: シトラス・グレープフルーツ🍊\n・シムコー: パイン・グレープフルーツ🌲\n・モザイク: マンゴー・ベリー🥭\n・アマリロ: オレンジ・花香🌸\n\n目指すスタイルに合わせて組み合わせを楽しんでください！',
+  '温度管理': '🌡 発酵温度管理は品質に直結します！\n\n**エールの場合（上面発酵）**\n・通常 18〜22℃が最適\n・低いとスローペース、高いと雑味が出やすい\n\n**ラガーの場合（下面発酵）**\n・8〜12℃で主発酵\n・0〜4℃でラガリング（2〜6週間）\n\n📱 **管理のコツ**\n・水槽に漬けて温度管理\n・冬場は発泡スチロール箱が有効\n・温度計アラームアプリを活用\n\n一定温度を保つことが美味しいビールへの近道です！',
+  '濁る': '🔍 ビールの濁りの原因と対策です！\n\n**主な原因**\n1. タンパク質 → コールドクラッシュ（0℃冷却）で解決\n2. 酵母の残留 → 長期熟成・フィルタリング\n3. チルヘイズ → アイリッシュモス（ボイル15分追加）\n4. デンプン → マッシュ温度の確認\n\n**対策**\n・アイリッシュモスやWhirflocタブレットを使用\n・コールドクラッシュ：発酵完了後に0℃で2〜3日\n・ゼラチンファイニング：大さじ1を少量水で溶かして添加\n\nウィットビアなど意図的に濁らせるスタイルもありますよ😄',
+};
+
+function quickAsk(text) {
+  document.getElementById('chatInput').value = text;
+  sendMsg();
+}
+
+async function sendMsg() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  addMsg(text, 'user');
+  input.value = '';
+  input.style.height = 'auto';
+
+  const apiKey = getKey();
+  const model = localStorage.getItem('modelSelect') || 'gpt-4o-mini';
+
+  // タイピング表示
+  const typingEl = document.createElement('div');
+  typingEl.className = 'msg ai typing';
+  typingEl.textContent = '🍺 醸造AIが考え中...';
+  document.getElementById('chatMessages').appendChild(typingEl);
+  scrollChat();
+
+  let answer = '';
+
+  if (apiKey && apiKey.startsWith('sk-')) {
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: text }],
+          max_tokens: 800,
+        })
+      });
+      const data = await res.json();
+      answer = data.choices?.[0]?.message?.content || 'エラーが発生しました。APIキーを確認してください。';
+    } catch (e) {
+      answer = '⚠️ 通信エラーが発生しました。ネットワークを確認してください。';
+    }
+  } else {
+    // デモモード
+    await new Promise(r => setTimeout(r, 800));
+    const key = Object.keys(DEMO_ANSWERS).find(k => text.includes(k));
+    answer = key ? DEMO_ANSWERS[key]
+      : `🍺 **デモモードの回答**\n\n「${text}」についてのご質問ですね！\n\nより詳しい回答を得るには、設定画面でOpenAI APIキーを登録してください。\n\nデモとして: ビールの醸造は大まかに①マッシング→②スパージング→③ボイル→④冷却→⑤発酵→⑥熟成→⑦瓶詰めの工程があります。どのステップについて詳しく知りたいですか？🍻`;
+  }
+
+  typingEl.remove();
+  addMsg(answer, 'ai');
+  scrollChat();
+}
+
+function addMsg(text, type) {
+  const wrap = document.createElement('div');
+  wrap.className = `msg ${type}`;
+  if (type === 'ai') {
+    wrap.innerHTML = `<div class="name">🍺 Brewery AI</div>${text.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')}`;
+  } else {
+    wrap.textContent = text;
+  }
+  document.getElementById('chatMessages').appendChild(wrap);
+}
+
+function scrollChat() {
+  const el = document.getElementById('chatMessages');
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── レシピカード ──────────────────────────
+function toggleRecipe(card) {
+  const detail = card.querySelector('.recipe-detail');
+  detail.classList.toggle('open');
+}
+
+// ── タイマー ──────────────────────────────
+const timers = {};
+
+function startTimer(id) {
+  if (timers[id]?.running) return;
+  const minInput = document.getElementById(id + 'Min');
+  const display = document.getElementById(id + 'Display');
+  if (!timers[id]?.remaining) {
+    timers[id] = { remaining: parseInt(minInput.value) * 60, running: false };
+  }
+  timers[id].running = true;
+  timers[id].interval = setInterval(() => {
+    if (timers[id].remaining <= 0) {
+      clearInterval(timers[id].interval);
+      timers[id].running = false;
+      display.textContent = '完了！✅';
+      if ('Notification' in window) new Notification('⏰ タイマー終了！', { body: id === 'mash' ? 'マッシュが完了しました🌾' : 'ボイルが完了しました🔥' });
+      return;
+    }
+    timers[id].remaining--;
+    const m = Math.floor(timers[id].remaining / 60).toString().padStart(2, '0');
+    const s = (timers[id].remaining % 60).toString().padStart(2, '0');
+    display.textContent = `${m}:${s}`;
+  }, 1000);
+}
+
+function pauseTimer(id) {
+  if (timers[id]) {
+    clearInterval(timers[id].interval);
+    timers[id].running = false;
+  }
+}
+
+function resetTimer(id) {
+  pauseTimer(id);
+  timers[id] = null;
+  const minInput = document.getElementById(id + 'Min');
+  const display = document.getElementById(id + 'Display');
+  const m = minInput.value.padStart(2, '0');
+  display.textContent = `${m}:00`;
+}
+
+// 発酵タイマー
+let fermStart = null;
+let fermDuration = 0;
+let fermInterval = null;
+
+function startFerm() {
+  const days = parseInt(document.getElementById('fermDays').value);
+  fermStart = new Date();
+  fermDuration = days;
+  localStorage.setItem('fermStart', fermStart.toISOString());
+  localStorage.setItem('fermDays', days);
+  updateFermDisplay();
+  clearInterval(fermInterval);
+  fermInterval = setInterval(updateFermDisplay, 60000);
+}
+
+function resetFerm() {
+  clearInterval(fermInterval);
+  fermStart = null;
+  localStorage.removeItem('fermStart');
+  document.getElementById('fermDisplay').textContent = document.getElementById('fermDays').value + '日';
+  document.getElementById('fermStatus').textContent = '';
+}
+
+function updateFermDisplay() {
+  if (!fermStart) return;
+  const now = new Date();
+  const endDate = new Date(fermStart.getTime() + fermDuration * 86400000);
+  const remaining = endDate - now;
+  if (remaining <= 0) {
+    document.getElementById('fermDisplay').textContent = '完了！🍺';
+    document.getElementById('fermStatus').textContent = '発酵が完了しました！瓶詰め準備をしましょう';
+  } else {
+    const d = Math.floor(remaining / 86400000);
+    const h = Math.floor((remaining % 86400000) / 3600000);
+    document.getElementById('fermDisplay').textContent = `${d}日 ${h}時間`;
+    document.getElementById('fermStatus').textContent = `開始: ${fermStart.toLocaleDateString('ja-JP')} | 終了予定: ${endDate.toLocaleDateString('ja-JP')}`;
+  }
+}
+
+// 起動時に発酵タイマー復元
+window.addEventListener('load', () => {
+  const fs = localStorage.getItem('fermStart');
+  const fd = localStorage.getItem('fermDays');
+  if (fs && fd) {
+    fermStart = new Date(fs);
+    fermDuration = parseInt(fd);
+    document.getElementById('fermDays').value = fd;
+    updateFermDisplay();
+    fermInterval = setInterval(updateFermDisplay, 60000);
+  }
+  // 通知許可リクエスト
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+});
+
+// ── Service Worker 登録 ──────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(reg => console.log('[PWA] SW登録成功:', reg.scope))
+      .catch(err => console.warn('[PWA] SW登録失敗:', err));
+  });
+}
+</script>
+</body>
+</html>

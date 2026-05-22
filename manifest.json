@@ -1,0 +1,27 @@
+{
+  "name": "Brewery AI",
+  "short_name": "BreweryAI",
+  "description": "AI搭載のブルワリー管理アプリ",
+  "start_url": "/brewery-ai.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a0a00",
+  "theme_color": "#c47c2b",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["food", "productivity"],
+  "screenshots": []
+}
